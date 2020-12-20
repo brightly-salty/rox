@@ -1,11 +1,13 @@
 extern crate anyhow;
 
 mod expr;
+mod interpreter;
 mod parser;
 mod scanner;
 mod tokens;
 
 use anyhow::Result;
+use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
 use std::env;
@@ -22,24 +24,25 @@ static HAD_ERROR: AtomicBool = AtomicBool::new(false);
 fn main() -> Result<()> {
     let mut args = env::args();
     args.next(); // Consume `rox`
+    let interpreter = Interpreter::new();
     if let Some(filename) = args.next() {
-        run_file(filename)?;
+        run_file(filename, interpreter)?;
     } else {
-        run_prompt()?;
+        run_prompt(interpreter)?;
     }
     Ok(())
 }
 
-fn run_file<P: AsRef<Path>>(filename: P) -> Result<()> {
+fn run_file<P: AsRef<Path>>(filename: P, interpreter: Interpreter) -> Result<()> {
     let contents = fs::read_to_string(filename)?;
-    run(&contents);
+    run(&contents, interpreter);
     if get_had_error() {
         panic!("There was an error running the file!")
     }
     Ok(())
 }
 
-fn run_prompt() -> Result<()> {
+fn run_prompt(interpreter: Interpreter) -> Result<()> {
     let mut stdout = io::stdout();
     let stdin = io::stdin();
     let mut input = String::new();
@@ -47,21 +50,21 @@ fn run_prompt() -> Result<()> {
         write!(stdout, "> ")?;
         stdout.flush()?;
         stdin.read_line(&mut input)?;
-        run(&input);
+        run(&input, interpreter.clone());
         set_had_error(false);
         input.clear();
     }
 }
 
-fn run(source: &str) {
+fn run(source: &str, interpreter: Interpreter) {
     let mut scanner = Scanner::new(source.to_owned());
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
-    let expression = parser.parse();
+    let expression = parser.parse().unwrap();
     if get_had_error() {
         return;
     }
-    println!("{:?}", expression);
+    interpreter.interpret(expression);
 }
 
 pub fn error(line: NonZeroUsize, message: &str) {
