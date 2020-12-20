@@ -1,7 +1,12 @@
+extern crate anyhow;
+
+mod expr;
+mod parser;
 mod scanner;
 mod tokens;
 
 use anyhow::Result;
+use parser::Parser;
 use scanner::Scanner;
 use std::env;
 use std::fs;
@@ -10,6 +15,7 @@ use std::io::Write;
 use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tokens::{Token, TokenType};
 
 static HAD_ERROR: AtomicBool = AtomicBool::new(false);
 
@@ -50,13 +56,28 @@ fn run_prompt() -> Result<()> {
 fn run(source: &str) {
     let mut scanner = Scanner::new(source.to_owned());
     let tokens = scanner.scan_tokens();
-    for token in &tokens {
-        println!("{:?}", token)
+    let mut parser = Parser::new(tokens);
+    let expression = parser.parse();
+    if get_had_error() {
+        return;
     }
+    println!("{:?}", expression);
 }
 
 pub fn error(line: NonZeroUsize, message: &str) {
     report(line, String::new(), message.to_owned());
+}
+
+pub fn error_at_token(token: Token, message: &str) {
+    if token.type_ == TokenType::Eof {
+        report(token.line, " at end".to_owned(), message.to_owned());
+    } else {
+        report(
+            token.line,
+            format!(" at '{}'", token.lexeme),
+            message.to_owned(),
+        );
+    }
 }
 
 fn report(line: NonZeroUsize, where_: String, message: String) {

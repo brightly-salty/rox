@@ -46,10 +46,10 @@ pub enum TokenType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
-    type_: TokenType,
-    lexeme: String,
-    literal: Option<Literal>,
-    line: NonZeroUsize,
+    pub type_: TokenType,
+    pub lexeme: String,
+    pub literal: Option<Literal>,
+    pub line: NonZeroUsize,
 }
 
 impl Token {
@@ -78,4 +78,6 @@ impl fmt::Display for Token {
 pub enum Literal {
     String_(String),
     Number(f64),
+    Bool(bool),
+    Nil,
 }
