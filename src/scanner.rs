@@ -1,4 +1,9 @@
-use crate::tokens::TokenType::*;
+use crate::tokens::TokenType::{
+    And, Bang, BangEqual, Class, Comma, Dot, Else, Eof, Equal, EqualEqual, False, For, Fun,
+    Greater, GreaterEqual, Identifier, If, LeftBrace, LeftParen, Less, LessEqual, Minus, Nil,
+    Number, Or, Plus, Print, Return, RightBrace, RightParen, Semicolon, Slash, Star, String_,
+    Super, This, True, Var, While,
+};
 use crate::tokens::{Literal, Token, TokenType};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -37,7 +42,7 @@ pub struct Scanner {
 }
 
 impl Scanner {
-    pub fn new(source: String) -> Self {
+    pub const fn new(source: String) -> Self {
         Self {
             source,
             tokens: Vec::new(),
@@ -201,11 +206,9 @@ impl Scanner {
             self.advance();
         }
         let text = &self.source[(self.start + 1)..(self.current - 1)];
-        let type_ = if let Some(type_) = KEYWORDS.get(text) {
-            type_.clone()
-        } else {
-            Identifier
-        };
+        let type_ = KEYWORDS
+            .get(text)
+            .map_or_else(|| Identifier, std::clone::Clone::clone);
         self.add_token(type_);
     }
 
@@ -214,6 +217,6 @@ impl Scanner {
     }
 }
 
-fn is_alphanumeric(c: char) -> bool {
+const fn is_alphanumeric(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
