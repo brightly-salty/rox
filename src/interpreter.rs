@@ -1,7 +1,8 @@
 use crate::ast::{Expr, ExprVisitor, Stmt, StmtVisitor};
 use crate::environment::Environment;
 use crate::tokens::TokenType::{
-    Bang, BangEqual, EqualEqual, Greater, GreaterEqual, Less, LessEqual, Minus, Plus, Slash, Star,
+    self, Bang, BangEqual, EqualEqual, Greater, GreaterEqual, Less, LessEqual, Minus, Plus, Slash,
+    Star,
 };
 use crate::tokens::{Literal, Token};
 use crate::value::Value;
@@ -24,26 +25,6 @@ impl Interpreter {
         }
     }
 
-    fn execute(&mut self, stmt: Stmt) {
-        match stmt {
-            Stmt::Block(stmts) => self.visit_block_stmt(stmts),
-            Stmt::Expression(stmt) => self.visit_expression_stmt(stmt),
-            Stmt::Print(stmt) => self.visit_print_stmt(stmt),
-            Stmt::Var(name, initializer) => self.visit_var_stmt(name, initializer),
-        }
-    }
-
-    fn evaluate(&mut self, expr: Expr) -> Value {
-        match expr {
-            Expr::Assign(name, value) => self.visit_assign_expr(name, value),
-            Expr::Binary(b, o, b2) => self.visit_binary_expr(b, o, b2),
-            Expr::Grouping(g) => self.visit_grouping_expr(g),
-            Expr::Literal(l) => self.visit_literal_expr(l),
-            Expr::Unary(operator, right) => self.visit_unary_expr(operator, right),
-            Expr::Variable(v) => self.visit_variable_expr(v),
-        }
-    }
-    
     fn execute_block(&mut self, statements: &[Stmt], environment: Environment) {
         let previous = self.environment.clone();
         self.environment = environment;
@@ -73,10 +54,27 @@ impl Interpreter {
 }
 
 impl StmtVisitor<()> for Interpreter {
+    fn visit_while_stmt(&mut self, condition: Expr, body: Box<Stmt>) {
+        while Self::is_truthy(&self.evaluate(condition.clone())) {
+            self.execute(*body.clone());
+        }
+    }
+    fn visit_if_stmt(
+        &mut self,
+        condition: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Box<Option<Stmt>>,
+    ) {
+        if Self::is_truthy(&self.evaluate(condition)) {
+            self.execute(*then_branch);
+        } else if let Some(else_branch) = *else_branch {
+            self.execute(else_branch);
+        }
+    }
     fn visit_block_stmt(&mut self, statements: Vec<Stmt>) {
         self.execute_block(&statements, Environment::new_from(self.environment.clone()));
     }
-    
+
     fn visit_expression_stmt(&mut self, stmt: Expr) {
         self.evaluate(stmt);
     }
@@ -94,6 +92,17 @@ impl StmtVisitor<()> for Interpreter {
 }
 
 impl ExprVisitor<Value> for Interpreter {
+    fn visit_logical_expr(&mut self, left: Box<Expr>, operator: Token, right: Box<Expr>) -> Value {
+        let left = self.evaluate(*left);
+        if operator.type_ == TokenType::Or {
+            if Self::is_truthy(&left) {
+                return left;
+            }
+        } else if !Self::is_truthy(&left) {
+            return left;
+        }
+        self.evaluate(*right)
+    }
     fn visit_assign_expr(&mut self, name: Token, value: Box<Expr>) -> Value {
         let value = self.evaluate(*value);
         self.environment.assign(name, value.clone()).unwrap();
@@ -174,7 +183,7 @@ impl ExprVisitor<Value> for Interpreter {
     fn visit_grouping_expr(&mut self, expression: Box<Expr>) -> Value {
         self.evaluate(*expression)
     }
-    fn visit_literal_expr(&self, value: Literal) -> Value {
+    fn visit_literal_expr(&mut self, value: Literal) -> Value {
         value.into()
     }
     fn visit_unary_expr(&mut self, operator: Token, right: Box<Expr>) -> Value {
